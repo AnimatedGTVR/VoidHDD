@@ -38,6 +38,13 @@ Void. Windows lives on the MSI NVMe with its own EFI partition and is unaffected
 Pick the HDD from the firmware boot menu (or set it first in NVRAM). GRUB has a
 5-second menu; `EFI/Void/grubx64.efi` also exists as a vendor entry.
 
+## xbps front-end installed
+
+`xbps` (repo root / `README.md`) is installed on the HDD at
+`/usr/local/bin/xbps`, mode `0755`, MD5 `8e238bbf70895346ad35b7a6e27c9457`
+(matches the repo copy). Verified in chroot: `xbps --help` works and
+`xbps -q -l` lists 172 installed packages.
+
 ## Known outstanding items
 
 - `/root/XBPS-REPAIR-REQUIRED`: base-files missing `/etc/issue`; two
