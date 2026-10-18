@@ -65,6 +65,45 @@ xbps -R linux6.12            # reconfigure a package
 xbps -D -a                   # check package database integrity
 ```
 
+## Planned desktop: niri + DankMaterialShell (staged, not installed)
+
+The install is a bare base system (172 packages, no X, no Wayland, no Mesa).
+The chosen desktop is **niri** (scrollable-tiling Wayland compositor) with
+**DankMaterialShell** as the shell layer, plus `dms-greeter` for login.
+
+`install-niri-dms.sh` is the reviewed, idempotent plan for turning the base
+system into that desktop. Run it on the real booted system as root:
+
+```sh
+sudo sh install-niri-dms.sh 2>&1 | tee ~/niri-dms-install.log
+```
+
+Order of operations, and why:
+
+1. **Swap the repo mirror.** The install pointed at `mirrors.summithq.com`,
+   not an official Void mirror.
+2. **Add the DankLinux xbps repos** (`void.danklinux.com`) — DMS, `dms-greeter`,
+   `dgop`, `danksearch` are not in Void's official repositories. Signed; xbps
+   shows the key fingerprint on first sync.
+3. **Update the system.** Kernel `6.12.11` + the Feb-2025 snapshot predate the
+   RX 9060 XT (RDNA4 / gfx1200). Mesa 25.0 was the first release with RDNA4
+   support, so without this step there is no GPU acceleration at all.
+   Void currently ships **kernel 6.18** and **Mesa 26.2.5**.
+4. **Install the stack**: `niri`, `xwayland-satellite`, `quickshell`, `dms`,
+   PipeWire, portals, fonts, `xwayland`, greeter.
+5. **Services on runit**: `dbus` + `elogind` (Wayland needs a seat manager;
+   never run `seatd` alongside `elogind`), optionally NetworkManager so the
+   DMS network widget works.
+6. **`dms-greeter enable`** does the Void-specific work: greetd `run` script
+   waiting on dbus/elogind, `_greeter` video/input groups, `pam_rundir`, and
+   `LIBSEAT_BACKEND=logind` (without it the greeter compositor uses seatd
+   and hangs).
+7. **`dms setup`** generates the niri config with keybinds + autostart.
+
+Void does not package `waybar`, `swaync`, `swww`, `swayosd` or `ags`, which is
+part of why a Quickshell-based shell (`quickshell` *is* packaged) is the
+low-friction route here. Flatpak is set up as a fallback for unpackaged apps.
+
 ## Recovery history
 
 The install was repaired in place. The main problems and fixes:
