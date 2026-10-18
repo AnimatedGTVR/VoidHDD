@@ -1,0 +1,22 @@
+# Large binary artifacts (disk images, ISOs, kernels, UEFI vars)
+*.img
+*.iso
+*.qcow2
+*.ppm
+*.fd
+*.bak
+boot/
+
+# Logs and interactive transcripts
+*.log
+
+# Screenshots
+*.png
+
+# Transient state
+*.pid
+*.b64
+
+# Python
+__pycache__/
+*.pyc

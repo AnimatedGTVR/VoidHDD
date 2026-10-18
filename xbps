@@ -1,0 +1,47 @@
+#!/bin/sh
+# xbps: unified front-end for the XBPS package tools.
+# Usage: xbps <shortcut> [tool args...]
+
+set -eu
+
+usage() {
+    cat <<'EOF'
+xbps - unified front-end for the XBPS package tools
+
+  xbps -i|--install  [args]     xbps-install [args]
+  xbps -u|--update   [args]     xbps-install -Su [args]
+  xbps -s|--sync     [args]     xbps-install -S [args]
+  xbps -r|--remove   [args]     xbps-remove [args]
+  xbps -q|--query    [args]     xbps-query [args]
+  xbps -R|--reconfigure [args]  xbps-reconfigure [args]
+  xbps -D|--pkgdb    [args]     xbps-pkgdb [args]
+
+Any further arguments are passed through unchanged to the selected tool.
+
+Examples:
+  xbps -i -y neovim        ->  xbps-install -y neovim
+  xbps -q -Rs '^linux'     ->  xbps-query -Rs '^linux'
+EOF
+}
+
+[ $# -eq 0 ] && { usage; exit 0; }
+
+flag=$1
+shift
+
+case "$flag" in
+    -i|-I|--install|-install)   exec xbps-install "$@" ;;
+    -u|-U|--update|--upgrade)   exec xbps-install -Su "$@" ;;
+    -s|--sync)                  exec xbps-install -S "$@" ;;
+    -r|--remove|--uninstall)    exec xbps-remove "$@" ;;
+    -q|-Q|--query|-query)       exec xbps-query "$@" ;;
+    -R|--reconfigure)           exec xbps-reconfigure "$@" ;;
+    -D|--pkgdb)                 exec xbps-pkgdb "$@" ;;
+    -h|--help|help)             usage ;;
+    *)
+        echo "xbps: unknown shortcut '$flag'" >&2
+        echo >&2
+        usage >&2
+        exit 2
+        ;;
+esac
