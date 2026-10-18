@@ -91,11 +91,33 @@ xbps-install -S || die "sync failed after adding DankLinux repos (bad key? remov
 # --- 5. full system update ----------------------------------------------
 echo "== system update (kernel 6.18 + Mesa 26.2.5) =="
 echo "$INFO from a 2025-02 snapshot this is a big one; several passes are normal"
+
+# xbps cannot cross a year+ of package versions in a single transaction: it must
+# update itself first, and again each time it says so.
+echo "$INFO updating xbps itself first"
+r=0
+while [ "$r" -lt 4 ]; do
+    r=$((r + 1))
+    out=$(xbps-install -Suy xbps </dev/null 2>&1) || true
+    printf '%s\n' "$out"
+    case "$out" in
+        *"must be updated"*) echo "$INFO xbps still wants another self-update (round $r)"; continue ;;
+    esac
+    break
+done
+
 i=0
 while [ "$i" -lt 8 ]; do
     i=$((i + 1))
     echo "--- update pass $i ---"
-    xbps-install -Suy </dev/null || die "update pass $i failed — read the errors above before re-running"
+    out=$(xbps-install -Suy </dev/null 2>&1) || { printf '%s\n' "$out"; die "update pass $i failed — read the errors above before re-running"; }
+    printf '%s\n' "$out"
+    case "$out" in
+        *"must be updated"*)
+            echo "$INFO another package must be updated first; re-running"
+            xbps-install -Suy xbps </dev/null >/dev/null 2>&1 || true
+            continue ;;
+    esac
     pending=$(xbps-install -Sun 2>/dev/null | grep -c . || true)
     [ "$pending" -eq 0 ] && break
     echo "$INFO $pending updates still pending"
@@ -160,25 +182,53 @@ echo "== dms-greeter (greetd on runit) =="
 if have dms-greeter; then
     echo "$INFO dms-greeter enable handles: dbus+elogind, greetd run script waiting"
     echo "$INFO on those services, _greeter groups, pam_rundir, LIBSEAT_BACKEND=logind"
-    dms-greeter enable || die "dms-greeter enable failed"
-    su -l "$HOST_USER" -c "dms-greeter sync" || echo "$WARN dms-greeter sync failed — rerun it later as $HOST_USER"
+    dms-greeter enable || echo "$WARN dms-greeter enable failed - re-run it after the first real boot"
+    # dms-greeter sync / dms setup try to add these groups themselves with sudo,
+    # which cannot prompt when we are running from a pipe; do it here as root.
+    getent group _greeter >/dev/null && usermod -aG _greeter "$HOST_USER" && echo "$OK $HOST_USER in _greeter"
+    getent group input    >/dev/null && usermod -aG input    "$HOST_USER" && echo "$OK $HOST_USER in input"
+    su -l "$HOST_USER" -c "dms-greeter sync" || echo "$WARN dms-greeter sync failed - rerun it later as $HOST_USER"
 else
     echo "$WARN dms-greeter not installed; skipping greeter setup"
 fi
 
 # --- 10. user config, flatpak, verify ------------------------------------
 echo "== user config =="
-if [ ! -f "/home/$HOST_USER/.config/niri/config.kdl" ]; then
-    su -l "$HOST_USER" -c "dms setup" || echo "$WARN 'dms setup' failed — run it as $HOST_USER"
-else
-    echo "$INFO existing niri config kept (backup: $BACKUP_DIR/niri)"
+NIRI_DIR="/home/$HOST_USER/.config/niri"
+CONFIG="$NIRI_DIR/config.kdl"
+mkdir -p "$NIRI_DIR"
+[ -d "/home/$HOST_USER/.config" ] && chown "$HOST_USER" "/home/$HOST_USER/.config"
+chown "$HOST_USER" "$NIRI_DIR"
+if [ ! -f "$CONFIG" ] && [ -t 0 ]; then
+    # dms setup is a menu-driven TUI, so it needs a real terminal
+    su -l "$HOST_USER" -c "dms setup" || echo "$WARN 'dms setup' failed - run it as $HOST_USER"
+elif [ ! -f "$CONFIG" ]; then
+    echo "$INFO no terminal, so writing a starter config; run 'dms setup' as $HOST_USER for the full TUI"
+fi
+if [ ! -f "$CONFIG" ]; then
+    cat > "$CONFIG" <<'NIRICONF'
+// Starter niri config written by install-niri-dms.sh (offline install).
+// Log in and run `dms setup` for the full interactive setup.
+input {
+    keyboard {
+        xkb { options "caps:super" }
+    }
+    touchpad { tap }
+}
+layout {
+    gaps 8
+    focus-ring { width 3 }
+    border { width 2 }
+}
+prefer-no-csd
+NIRICONF
 fi
 # make sure DMS and pipewire autostart regardless of what dms setup wrote
 for entry in 'spawn-at-startup "dms" "run"' 'spawn-at-startup "pipewire"'; do
-    grep -qF "$entry" "/home/$HOST_USER/.config/niri/config.kdl" 2>/dev/null || \
-        echo "$entry" >> "/home/$HOST_USER/.config/niri/config.kdl"
+    grep -qF "$entry" "$CONFIG" 2>/dev/null || echo "$entry" >> "$CONFIG"
 done
-chown -R "$HOST_USER" "/home/$HOST_USER/.config/niri" 2>/dev/null || true
+chown -R "$HOST_USER" "$NIRI_DIR" 2>/dev/null || true
+echo "$OK niri config at $CONFIG"
 
 echo "== flatpak =="
 if have flatpak; then
@@ -223,3 +273,4 @@ Notes:
     on real hardware
 ==================================================================
 EOF
+echo INSTALL_SCRIPT_FINISHED
