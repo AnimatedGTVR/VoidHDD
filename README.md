@@ -13,9 +13,10 @@ Windows stays on its own NVMe drive and is untouched.
 | Boot | UEFI → GRUB → Void (`EFI/BOOT/BOOTX64.EFI` fallback, `EFI/Void/grubx64.efi`) |
 | Hostname | `void` |
 | Timezone | `America/New_York` |
-| User | `animated` (groups: `wheel`, `audio`, `video`, `input`, `network`, `kvm`, `_greeter`) |
-| Desktop | niri 26.04 + dms 1.6.3, login via dms-greeter/greetd on vt 7 |
-| Verified | Booted in QEMU and logged in as `animated` (pre-desktop) |
+| User | `animated` (groups: `wheel`, `floppy`, `audio`, `video`, `cdrom`, `optical`, `network`, `kvm`, `input`, `users`, `xbuilder`, `_greeter`), shell `/bin/zsh` |
+| Desktop | niri 26.04 + dms 1.6.3, themed: ghostty, starship/zsh, matugen colours |
+| Login | dms-greeter/greetd on vt 7, wallpaper + theme synced from `animated` |
+| Verified | Booted in QEMU, logged in, desktop + theming applied (see THEMING.md) |
 
 To boot on real hardware, select the WDC HDD from the firmware boot menu (the
 removable fallback path works with no NVRAM entry). GRUB shows a 5-second menu;
@@ -106,6 +107,16 @@ Void does not package `waybar`, `swaync`, `swww`, `swayosd` or `ags`, which is
 part of why a Quickshell-based shell (`quickshell` *is* packaged) is the
 low-friction route here. Flatpak is set up as a fallback for unpackaged apps.
 
+### Theming
+
+`dms setup headless --compositor niri --terminal ghostty --no-systemd` generates
+the real niri config (keybinds, colours, layout, outputs, windowrules as
+`~/.config/niri/dms/*.kdl`) instead of a hand-written starter. On top of that,
+`ghostty` + `zsh` + `starship` + `eza`/`bat`/`fastfetch` are installed, the
+wallpaper lives in `~/.local/state/DankMaterialShell/session.json`, and matugen
+derives the entire colour scheme from it. `THEMING.md` has the full list and the
+first-login checks.
+
 ## Recovery history
 
 The install was repaired in place. The main problems and fixes:
@@ -149,6 +160,8 @@ The install was repaired in place. The main problems and fixes:
 | `install-xbps-wrapper.sh` | Puts the `xbps` shim in `/usr/local/bin` |
 | `run-in-chroot.sh` | Runs the installer offline, inside a chroot |
 | `finish-dms.sh`, `verify-final.sh`, `check-*.sh`, `poll.sh` | Post-install fix-ups, verification, monitoring |
+| `phase1a-apply.sh` … `phase1g-wallpaper.sh` | Theming pass: packages, shell, wallpaper, portals, validation |
+| `THEMING.md` | Terminal/shell/wallpaper setup, wallpaper list, first-login checks |
 | `INSTALL-RESULT.md` | What the install actually did, and what is left |
 | `RECOVERY-STATUS.md` | Canonical record of the final state |
 | `findings.md` | Early QEMU display/boot diagnostics |
