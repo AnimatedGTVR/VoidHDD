@@ -8,13 +8,14 @@ Windows stays on its own NVMe drive and is untouched.
 
 | Item | Value |
 | --- | --- |
-| OS | Void Linux, kernel `6.12.11_1`, dracut initramfs |
+| OS | Void Linux, kernel `6.18.57_1` (also keeps `6.12.x`), dracut initramfs |
 | Root | ext4, UUID `244b05bb-faa3-4062-ae79-6ef9d4afe6df` on partition 2 |
 | Boot | UEFI → GRUB → Void (`EFI/BOOT/BOOTX64.EFI` fallback, `EFI/Void/grubx64.efi`) |
 | Hostname | `void` |
 | Timezone | `America/New_York` |
-| User | `animated` (groups: `wheel`, `audio`, `video`, `network`) |
-| Verified | Booted in QEMU and logged in as `animated` |
+| User | `animated` (groups: `wheel`, `audio`, `video`, `input`, `network`, `kvm`, `_greeter`) |
+| Desktop | niri 26.04 + dms 1.6.3, login via dms-greeter/greetd on vt 7 |
+| Verified | Booted in QEMU and logged in as `animated` (pre-desktop) |
 
 To boot on real hardware, select the WDC HDD from the firmware boot menu (the
 removable fallback path works with no NVRAM entry). GRUB shows a 5-second menu;
@@ -65,14 +66,15 @@ xbps -R linux6.12            # reconfigure a package
 xbps -D -a                   # check package database integrity
 ```
 
-## Planned desktop: niri + DankMaterialShell (staged, not installed)
+## Desktop: niri + DankMaterialShell (INSTALLED — see INSTALL-RESULT.md)
 
-The install is a bare base system (172 packages, no X, no Wayland, no Mesa).
-The chosen desktop is **niri** (scrollable-tiling Wayland compositor) with
-**DankMaterialShell** as the shell layer, plus `dms-greeter` for login.
+The desktop is now on the disk: 547 packages, kernel 6.18.57, Mesa 26.2.5,
+niri 26.04, dms 1.6.3, dms-greeter 1.6.2, 51 DRI drivers. `INSTALL-RESULT.md`
+has the outcome, the four things the run taught us, and the follow-ups.
 
-`install-niri-dms.sh` is the reviewed, idempotent plan for turning the base
-system into that desktop. Run it on the real booted system as root:
+`install-niri-dms.sh` remains the idempotent, re-runnable plan. It was reviewed
+and then run against the offline install via `run-in-chroot.sh` (the same
+packages land on the real disk). To run it again on a booted system as root:
 
 ```sh
 sudo sh install-niri-dms.sh 2>&1 | tee ~/niri-dms-install.log
@@ -131,13 +133,11 @@ The install was repaired in place. The main problems and fixes:
 ### Outstanding
 
 - `/root/XBPS-REPAIR-REQUIRED` marks package-integrity issues found during
-  recovery: `base-files` is missing `/etc/issue` and two `linux-firmware-amd`
-  files have hash mismatches. Fix while online with:
-
-  ```sh
-  sudo xbps -i -f base-files linux-firmware-amd
-  ```
-
+  recovery: `base-files` was missing `/etc/issue` and two `linux-firmware-amd`
+  files had hash mismatches. The full update has since reinstalled both; confirm
+  `/etc/issue` exists, then delete the marker.
+- Old kernels `6.12.11_1` and `6.12.113_1` are still in `/boot`; remove with
+  `sudo xbps-remove -o` once 6.18 has booted.
 - Windows NVRAM entries were never modified (all installs used `--no-nvram`).
 
 ## Repository layout
@@ -145,6 +145,11 @@ The install was repaired in place. The main problems and fixes:
 | Path | Purpose |
 | --- | --- |
 | `xbps` | Unified XBPS front-end |
+| `install-niri-dms.sh` | Installs the niri + DMS desktop (idempotent) |
+| `install-xbps-wrapper.sh` | Puts the `xbps` shim in `/usr/local/bin` |
+| `run-in-chroot.sh` | Runs the installer offline, inside a chroot |
+| `finish-dms.sh`, `verify-final.sh`, `check-*.sh`, `poll.sh` | Post-install fix-ups, verification, monitoring |
+| `INSTALL-RESULT.md` | What the install actually did, and what is left |
 | `RECOVERY-STATUS.md` | Canonical record of the final state |
 | `findings.md` | Early QEMU display/boot diagnostics |
 | `recover-hdd-offline-v2.sh` | GPT + EFI restore, ext4 repair |
